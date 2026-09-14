@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>翻页时钟</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{
+  width:100%;height:100%;background:#000;overflow:hidden;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  color:#fff;-webkit-user-select:none;-moz-user-select:none;user-select:none;
+  overscroll-behavior:none;-ms-touch-action:manipulation;touch-action:manipulation;
+}
+#stage{
+  position:fixed;left:0;top:0;width:100%;height:100%;background:#000;
+  display:-webkit-box;display:-webkit-flex;display:flex;
+  -webkit-box-align:center;-webkit-align-items:center;align-items:center;
+  -webkit-box-pack:center;-webkit-justify-content:center;justify-content:center;
+  overflow:hidden;z-index:1;
+  --dh:100px;--dw:66px;--fs:112px;--r:13px;
+  --inner-gap:6px;--group-gap:20px;
+  padding-bottom:0;
+  -webkit-transition:padding-bottom .35s ease;transition:padding-bottom .35s ease;
+}
+#stage.dock-shown{padding-bottom:6vh;}
+#stage.alarming{-webkit-animation:alarmFlash .8s ease-in-out 8;animation:alarmFlash .8s ease-in-out 8}
+@-webkit-keyframes alarmFlash{
+  0%,100%{background:#000}
+  50%{background:rgba(255,30,30,.85)}
+}
+@keyframes alarmFlash{
+  0%,100%{background:#000}
+  50%{background:rgba(255,30,30,.85)}
+}
+
+#content{
+  display:-webkit-box;display:-webkit-flex;display:flex;
+  -webkit-box-orient:vertical;-webkit-box-direction:normal;-webkit-flex-direction:column;flex-direction:column;
+  -webkit-box-align:center;-webkit-align-items:center;align-items:center;
+  -webkit-box-pack:center;-webkit-justify-content:center;justify-content:center;
+  -webkit-transition:-webkit-transform .55s cubic-bezier(.32,.72,0,1),-webkit-filter .8s ease;
+  transition:transform .55s cubic-bezier(.32,.72,0,1),filter .8s ease;
+  will-change:transform,filter;
+  -webkit-transform:translate3d(0,0,0);transform:translate3d(0,0,0);
+}
+.clock{
+  display:-webkit-box;display:-webkit-flex;display:flex;
+  -webkit-box-align:center;-webkit-align-items:center;align-items:center;
+  -webkit-box-pack:center;-webkit-justify-content:center;justify-content:center;
+}
+.group-col{
+  display:-webkit-box;display:-webkit-flex;display:flex;
+  -webkit-box-orient:vertical;-webkit-box-direction:normal;-webkit-flex-direction:column;flex-direction:column;
+  -webkit-box-align:center;-webkit-align-items:center;align-items:center;
+}
+.group-col + .group-col{margin-left:var(--group-gap);}
+.group-col[data-gkey="s"].hidden{display:none !important;}
+.group{display:-webkit-box;display:-webkit-flex;display:flex;position:relative;}
+.group .card + .card{margin-left:var(--inner-gap);}
+
+.card{
+  position:relative;width:var(--dw);height:var(--dh);
+  -webkit-perspective:calc(var(--dh) * 3.2);perspective:calc(var(--dh) * 3.2);
+  border-radius:var(--r);background:#0a0a0c;
+  box-shadow:0 1px 2px rgba(0,0,0,.8);
+}
+.card::after{
+  content:"";position:absolute;left:0;right:0;top:50%;
+  height:1px;margin-top:-0.5px;
+  background:rgba(0,0,0,.95);z-index:8;pointer-events:none;
+}
+.half{
+  position:absolute;left:0;width:100%;height:50%;
+  overflow:hidden;
+  -webkit-backface-visibility:hidden;backface-visibility:hidden;
+}
+.half.upper{top:0;border-radius:var(--r) var(--r) 0 0;background:#1c1c1e;z-index:1;}
+.half.lower{top:50%;border-radius:0 0 var(--r) var(--r);background:#0d0d0f;z-index:1;}
+.inner{
+  position:absolute;left:0;width:100%;height:var(--dh);
+  display:-webkit-box;display:-webkit-flex;display:-ms-flexbox;display:flex;
+  -webkit-box-align:center;-webkit-align-items:center;-ms-flex-align:center;align-items:center;
+  -webkit-box-pack:center;-webkit-justify-content:center;-ms-flex-pack:center;justify-content:center;
+  font-size:var(--fs);line-height:1;font-weight:600;color:#fff;
+  font-variant-numeric:tabular-nums;font-feature-settings:"tnum";
+  letter-spacing:-0.02em;
+  padding-top:0.04em;
+}
+.half.upper .inner{top:0;}
+.half.lower .inner{bottom:0;}
+.flip{z-index:3;}
+.flip-top{-webkit-transform-origin:bottom center;transform-origin:bottom center;}
+.flip-bottom{-webkit-transform-origin:top center;transform-origin:top center;}
+
+.adj{
+  -webkit-appearance:none;appearance:none;border:none;
+  width:calc(var(--dh) * 0.50);height:calc(var(--dh) * 0.50);
+  border-radius:50%;background:#2c2c2e;color:rgba(255,255,255,.75);
+  font-size:calc(var(--dh) * 0.26);font-weight:300;line-height:1;
+  cursor:pointer;
+  display:-webkit-box;display:-webkit-flex;display:-ms-flexbox;display:flex;
+  -webkit-box-align:center;-webkit-align-items:center;-ms-flex-align:center;align-items:center;
+  -webkit-box-pack:center;-webkit-justify-content:center;-ms-flex-pack:center;justify-content:center;
+  padding:0;margin:calc(var(--dh) * 0.08) 0;
+  -webkit-transition:background .15s ease,-webkit-transform .12s ease;
+  transition:background .15s ease,transform .12s ease;
+  position:relative;z-index:20;
+}
+.adj:active{-webkit-transform:scale(.85);transform:scale(.85);background:#48484a;color:#fff;}
+.adj.hide{display:none;}
+
+.mini-sec{
+  position:absolute;top:100%;right:0;
+  margin-top:calc(var(--dh) * 0.11);
+  padding:calc(var(--dh)*0.055) calc(var(--dh)*0.13);
+  font-size:calc(var(--dh) * 0.215);
+  font-weight:600;line-height:1;color:#8e8e93;
+  background:#1c1c1e;border-radius:999px;letter-spacing:.02em;
+  font-variant-numeric:tabular-nums;
+  pointer-events:none;white-space:nowrap;
+  -webkit-transition:opacity .3s ease,-webkit-transform .3s ease;
+  transition:opacity .3s ease,transform .3s ease;
+}
+.mini-sec.hide{opacity:0;-webkit-transform:scale(.5);transform:scale(.5);pointer-events:none;}
+
+.info{
+  margin-top:calc(var(--dh) * 0.35);
+  display:-webkit-box;display:-webkit-flex;display:-ms-flexbox;display:flex;
+  -webkit-flex-wrap:wrap;-ms-flex-wrap:wrap;flex-wrap:wrap;
+  -webkit-box-align:center;-webkit-align-items:center;-ms-flex-align:center;align-items:center;
+  -webkit-box-pack:center;-webkit-justify-content:center;-ms-flex-pack:center;justify-content:center;
+  gap:.85em;color:#8e8e93;
+  font-size:calc(var(--dh) * 0.15);
+  font-weight:500;letter-spacing:.02em;
+  font-variant-numeric:tabular-nums;
+  padding:0 12px;text-align:center;min-height:1em;
+  -webkit-transition:margin-top .35s cubic-bezier(.25,.1,.25,1);
+  transition:margin-top .35s cubic-bezier(.25,.1,.25,1);
+}
+#content.has-mini-sec .info{margin-top:calc(var(--dh) * 0.58);}
+.info .i-item{white-space:nowrap;}
+
+.dock{
+  position:fixed;left:50%;bottom:16px;
+  -webkit-transform:translateX(-50%);transform:translateX(-50%);
+  display:-webkit-box;display:-webkit-flex;display:-ms-flexbox;display:flex;
+  -webkit-box-align:center;-webkit-align-items:center;-ms-flex-align:center;align-items:center;
+  -webkit-box-pack:center;-webkit-justify-content:center;-ms-flex-pack:center;justify-content:center;
+  -webkit-flex-wrap:nowrap;-ms-flex-wrap:nowrap;flex-wrap:nowrap;
+  padding:5px;max-width:96vw;
+  background:#1c1c1e;border:1px solid #2c2c2e;border-radius:999px;
+  box-shadow:0 4px 12px rgba(0,0,0,.8);
+  z-index:100;
+  -webkit-transition:opacity .28s ease,-webkit-transform .28s ease;
+  transition:opacity .28s ease,transform .28s ease;
+}
+.dock.hide{opacity:0;pointer-events:none;-webkit-transform:translateX(-50%) translateY(24px);transform:translateX(-50%) translateY(24px);}
+
+.dock-btn{
+  -webkit-appearance:none;appearance:none;border:none;
+  background:#2c2c2e;color:#e8e8ec;
+  font-family:inherit;font-size:13px;font-weight:500;letter-spacing:.01em;
+  padding:9px 11px;border-radius:999px;line-height:1;white-space:nowrap;
+  cursor:pointer;margin:0 2px;
+  -webkit-transition:background .15s ease,-webkit-transform .1s ease;
+  transition:background .15s ease,transform .1s ease;
+  -webkit-flex-shrink:0;flex-shrink:0;
+}
+.dock-btn:active{-webkit-transform:scale(.93);transform:scale(.93);background:#48484a;}
+.dock-btn.hide{display:none;}
+.dock-btn.mode{background:#2c2c2e;color:#e8e8ec;font-weight:500;}
+.dock-btn.mode.active-clock{background:#0a84ff;color:#fff;font-weight:600;}
+.dock-btn.mode.active-stopwatch{background:#30d158;color:#000;font-weight:600;}
+.dock-btn.mode.active-countdown{background:#ff9f0a;color:#fff;font-weight:600;}
+.dock-btn.primary{background:#30d158;color:#000;font-weight:600;}
+.dock-btn.primary:active{background:#4ade7a;}
+
+.dock-btn.icon{
+  padding:0;width:36px;height:36px;
+  display:-webkit-box;display:-webkit-flex;display:-ms-flexbox;display:flex;
+  -webkit-box-align:center;-webkit-align-items:center;-ms-flex-align:center;align-items:center;
+  -webkit-box-pack:center;-webkit-justify-content:center;-ms-flex-pack:center;justify-content:center;
+  background:#2c2c2e;
+  -webkit-flex-shrink:0;flex-shrink:0;
+}
+.dock-btn.icon svg{
+  width:18px;height:18px;stroke:#d0d0d6;stroke-width:1.9;fill:none;
+  stroke-linecap:round;stroke-linejoin:round;
+  pointer-events:none;display:none;
+}
+#btnSound .icon-on{display:none;}
+#btnSound .icon-off{display:none;}
+#btnSound.on .icon-on{display:block;}
+#btnSound:not(.on) .icon-off{display:block;}
+
+@media (max-width: 400px){
+  .dock-btn.mode{font-size:12px;padding:8px 10px;}
+  .dock-btn.icon{width:32px;height:32px;}
+  .dock-btn.icon svg{width:16px;height:16px;}
+}
+@media (max-width: 340px){
+  .dock-btn.mode{font-size:11px;padding:7px 8px;}
+  .dock-btn.icon{width:30px;height:30px;}
+  .dock-btn.icon svg{width:15px;height:15px;}
+}
+
+.sheet-backdrop{
+  position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.5);
+  opacity:0;pointer-events:none;
+  -webkit-transition:opacity .3s ease;transition:opacity .3s ease;
+  z-index:150;
+}
+.sheet-backdrop.show{opacity:1;pointer-events:auto;}
+
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;max-height:70vh;
+  border-radius:20px 20px 0 0;
+  -webkit-transform:translateY(100%);transform:translateY(100%);
+  z-index:200;
+  display:-webkit-box;display:-webkit-flex;display:-ms-flexbox;display:flex;
+  -webkit-box-orient:vertical;-webkit-box-direction:normal;-webkit-flex-direction:column;-ms-flex-direction:column;flex-direction:column;
+  overflow:hidden;
+  background:#1c1c1e;
+  box-shadow:0 -4px 20px rgba(0,0,0,.8);
+  will-change:transform;
+  -webkit-transform-origin:bottom center;transform-origin:bottom center;
+}
+.sheet.animating{
+  -webkit-transition:-webkit-transform .35s ease;transition:transform .35s ease;
+}
+.sheet-header{
+  position:relative;padding:16px 20px 12px;
+  -webkit-flex-shrink:0;flex-shrink:0;
+  cursor:grab;-ms-touch-action:none;touch-action:none;z-index:3;
+}
+.sheet-header::before{
+  content:"";position:absolute;top:9px;left:50%;margin-left:-21px;
+  width:42px;height:5px;border-radius:3px;background:#48484a;pointer-events:none;
+}
+.sheet-header-row{
+  display:-webkit-box;display:-webkit-flex;display:-ms-flexbox;display:flex;
+  -webkit-box-align:center;-webkit-align-items:center;-ms-flex-align:center;align-items:center;
+  -webkit-box-pack:justify;-webkit-justify-content:space-between;-ms-flex-pack:justify;justify-content:space-between;
+  padding-top:8px;
+}
+.sheet-title{font-size:19px;font-weight:700;color:#fff;letter-spacing:-0.01em;pointer-events:none;}
+.sheet-done{
+  -webkit-appearance:none;appearance:none;border:none;background:transparent;
+  color:#0a84ff;font-family:inherit;font-size:16px;font-weight:500;
+  padding:6px 0;cursor:pointer;
+}
+.sheet-done:active{opacity:.5;}
+.sheet-body{
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:0 16px 26px;
+  -webkit-box-flex:1;-webkit-flex:1;-ms-flex:1;flex:1;
+  position:relative;z-index:3;overscroll-behavior:contain;
+}
+.section{margin-top:18px;}
+.section:first-child{margin-top:4px;}
+.section-title{
+  font-size:12px;font-weight:600;color:#8e8e93;
+  text-transform:uppercase;letter-spacing:.08em;padding:0 6px 9px;
+}
+.section-content{background:#2c2c2e;border-radius:12px;overflow:hidden;}
+.row{
+  display:-webkit-box;display:-webkit-flex;display:-ms-flexbox;display:flex;
+  -webkit-box-align:center;-webkit-align-items:center;-ms-flex-align:center;align-items:center;
+  -webkit-box-pack:justify;-webkit-justify-content:space-between;-ms-flex-pack:justify;justify-content:space-between;
+  padding:12px 16px;min-height:50px;gap:12px;
+}
+.row + .row{border-top:1px solid #3a3a3c;}
+.row-label{font-size:15px;font-weight:400;color:#eaeaea;-webkit-flex-shrink:0;flex-shrink:0;}
+.row-sub{font-size:11px;color:#8e8e93;margin-top:2px;display:block;}
+
+.switch{position:relative;display:inline-block;width:50px;height:30px;-webkit-flex-shrink:0;flex-shrink:0;}
+.switch input{opacity:0;width:0;height:0;position:absolute;}
+.switch .slider{
+  position:absolute;left:0;top:0;right:0;bottom:0;
+  background:#48484a;border-radius:15px;
+  -webkit-transition:background .2s ease;transition:background .2s ease;cursor:pointer;
+}
+.switch .slider::before{
+  content:"";position:absolute;width:26px;height:26px;left:2px;top:2px;
+  background:#fff;border-radius:50%;
+  -webkit-transition:-webkit-transform .25s cubic-bezier(.32,.72,0,1);
+  transition:transform .25s cubic-bezier(.32,.72,0,1);
+}
+.switch input:checked + .slider{background:#34c759;}
+.switch input:checked + .slider::before{-webkit-transform:translateX(20px);transform:translateX(20px);}
+
+.seg{
+  display:-webkit-inline-box;display:-webkit-inline-flex;display:-ms-inline-flexbox;display:inline-flex;
+  background:#3a3a3c;border-radius:9px;padding:2px;
+}
+.seg-btn{
+  -webkit-appearance:none;appearance:none;border:none;background:transparent;
+  color:#a0a0a8;font-family:inherit;font-size:13px;font-weight:500;
+  padding:6px 12px;border-radius:7px;cursor:pointer;
+  -webkit-transition:background .15s ease,color .15s ease;
+  transition:background .15s ease,color .15s ease;white-space:nowrap;
+}
+.seg-btn.on{background:#636366;color:#fff;font-weight:600;}
+.seg-btn:active{opacity:.7;}
+
+.chips{
+  display:-webkit-box;display:-webkit-flex;display:-ms-flexbox;display:flex;
+  gap:6px;-webkit-flex-wrap:wrap;-ms-flex-wrap:wrap;flex-wrap:wrap;
+  -webkit-box-pack:end;-webkit-justify-content:flex-end;-ms-flex-pack:end;justify-content:flex-end;
+}
+.chip{
+  -webkit-appearance:none;appearance:none;border:none;
+  background:#3a3a3c;color:#a0c0ff;font-family:inherit;
+  font-size:13px;font-weight:500;padding:7px 14px;border-radius:999px;cursor:pointer;
+  -webkit-transition:background .15s ease,-webkit-transform .1s ease;
+  transition:background .15s ease,transform .1s ease;white-space:nowrap;
+}
+.chip:active{-webkit-transform:scale(.94);transform:scale(.94);background:#636366;color:#fff;}
+</style>
+</head>
+<body>
+
+<div id="stage" class="dock-shown">
+  <div id="content">
+    <div class="clock" id="clock"></div>
+    <div class="info" id="info">
+      <span class="i-item" id="iAmPm"></span>
+      <span class="i-item" id="iYear"></span>
+      <span class="i-item" id="iDate"></span>
+      <span class="i-item" id="iWeek"></span>
+      <span class="i-item" id="iBat"></span>
+    </div>
+  </div>
+</div>
+
+<div class="dock" id="dock">
+  <button class="dock-btn mode" id="btnClock">时钟</button>
+  <button class="dock-btn mode" id="btnStopwatch">正计时</button>
+  <button class="dock-btn mode" id="btnCountdown">倒计时</button>
+  <button class="dock-btn primary" id="btnStart" style="display:none;">开始</button>
+  <button class="dock-btn" id="btnReset" style="display:none;">重置</button>
+  <button class="dock-btn icon on" id="btnSound" aria-label="声音">
+    <svg class="icon-on" viewBox="0 0 24 24">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#d0d0d6" stroke="none"/>
+      <path d="M15.5 8.5a5 5 0 0 1 0 7"/>
+      <path d="M18.5 5.5a9 9 0 0 1 0 13"/>
+    </svg>
+    <svg class="icon-off" viewBox="0 0 24 24">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#d0d0d6" stroke="none"/>
+      <line x1="22" y1="9" x2="16" y2="15"/>
+      <line x1="16" y1="9" x2="22" y2="15"/>
+    </svg>
+  </button>
+  <button class="dock-btn icon" id="btnFullscreen" aria-label="全屏">
+    <svg viewBox="0 0 24 24" style="display:block">
+      <path d="M8 3H5a2 2 0 0 0-2 2v3"/>
+      <path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
+      <path d="M3 16v3a2 2 0 0 0 2 2h3"/>
+      <path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
+    </svg>
+  </button>
+  <button class="dock-btn icon" id="btnSettings" aria-label="设置">
+    <svg viewBox="0 0 24 24" style="display:block">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+  </button>
+</div>
+
+<div class="sheet-backdrop" id="sheetBackdrop"></div>
+
+<div class="sheet" id="sheet">
+  <div class="sheet-header" id="sheetHeader">
+    <div class="sheet-header-row">
+      <div class="sheet-title">设置</div>
+      <button class="sheet-done" id="btnSheetDone">完成</button>
+    </div>
+  </div>
+  <div class="sheet-body">
+
+    <div class="section">
+      <div class="section-title">显示</div>
+      <div class="section-content">
+        <div class="row"><span class="row-label">年份</span>
+          <label class="switch"><input type="checkbox" data-key="year"><span class="slider"></span></label></div>
+        <div class="row"><span class="row-label">日期</span>
+          <label class="switch"><input type="checkbox" data-key="date"><span class="slider"></span></label></div>
+        <div class="row"><span class="row-label">星期</span>
+          <label class="switch"><input type="checkbox" data-key="week"><span class="slider"></span></label></div>
+        <div class="row"><span class="row-label">电量</span>
+          <label class="switch"><input type="checkbox" data-key="battery"><span class="slider"></span></label></div>
+        <div class="row"><span class="row-label">秒</span>
+          <label class="switch"><input type="checkbox" data-key="seconds"><span class="slider"></span></label></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">时间格式</div>
+      <div class="section-content">
+        <div class="row"><span class="row-label">小时制</span>
+          <div class="seg">
+            <button class="seg-btn" data-act="hour12" data-val="0">24 小时</button>
+            <button class="seg-btn" data-act="hour12" data-val="1">12 小时</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">计时</div>
+      <div class="section-content">
+        <div class="row"><span class="row-label">预设</span>
+          <div class="chips">
+            <button class="chip" data-preset="300">5 分</button>
+            <button class="chip" data-preset="600">10 分</button>
+            <button class="chip" data-preset="1500">25 分</button>
+          </div>
+        </div>
+        <div class="row"><span class="row-label">归零报警声</span>
+          <label class="switch"><input type="checkbox" data-key="alarmSound"><span class="slider"></span></label></div>
+        <div class="row"><span class="row-label">归零屏幕闪烁</span>
+          <label class="switch"><input type="checkbox" data-key="alarmFlash"><span class="slider"></span></label></div>
+        <div class="row"><span class="row-label">点击数字调时</span>
+          <label class="switch"><input type="checkbox" data-key="clickAdjust"><span class="slider"></span></label></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">屏幕</div>
+      <div class="section-content">
+        <div class="row"><span class="row-label">防烧屏</span>
+          <label class="switch"><input type="checkbox" data-key="burnin"><span class="slider"></span></label></div>
+        <div class="row"><span class="row-label">夜间自动调暗</span>
+          <label class="switch"><input type="checkbox" data-key="nightAuto"><span class="slider"></span></label></div>
+        <div class="row"><span class="row-label">亮度</span>
+          <div class="seg">
+            <button class="seg-btn" data-act="bright" data-val="1">100</button>
+            <button class="seg-btn" data-act="bright" data-val="0.7">70</button>
+            <button class="seg-btn" data-act="bright" data-val="0.45">45</button>
+            <button class="seg-btn" data-act="bright" data-val="0.25">25</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">方向</div>
+      <div class="section-content">
+        <div class="row">
+          <span class="row-label">横屏显示
+            <span class="row-sub">强制网页旋转 90°</span>
+          </span>
+          <label class="switch"><input type="checkbox" data-key="rotated"><span class="slider"></span></label></div>
+        <div class="row">
+          <span class="row-label">锁定方向
+            <span class="row-sub">全屏下才生效</span>
+          </span>
+          <label class="switch"><input type="checkbox" data-key="locked"><span class="slider"></span></label></div>
+        <div class="row">
+          <span class="row-label">自动横屏全屏
+            <span class="row-sub">手机横过来时自动进全屏</span>
+          </span>
+          <label class="switch"><input type="checkbox" data-key="autoLandscapeFullscreen"><span class="slider"></span></label></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+function closest(el, sel){
+  while (el && el !== document){
+    if (el.matches && el.matches(sel)) return el;
+    el = el.parentNode;
+  }
+  return null;
+}
+function hasClass(el, cls){
+  if (!el) return false;
+  if (el.classList) return el.classList.contains(cls);
+  return (' ' + el.className + ' ').indexOf(' ' + cls + ' ') > -1;
+}
+function addClass(el, cls){
+  if (!el) return;
+  if (el.classList) { el.classList.add(cls); return; }
+  if (!hasClass(el, cls)) el.className += ' ' + cls;
+}
+function removeClass(el, cls){
+  if (!el) return;
+  if (el.classList) { el.classList.remove(cls); return; }
+  el.className = (' ' + el.className + ' ').replace(' ' + cls + ' ', ' ').replace(/^\s+|\s+$/g, '');
+}
+function toggleClass(el, cls, force){
+  if (!el) return;
+  if (force === undefined) force = !hasClass(el, cls);
+  if (force) addClass(el, cls); else removeClass(el, cls);
+}
+
+var state = {
+  seconds: true, year: false, date: true, week: true, battery: true,
+  rotated: false, sound: true, burnin: true, locked: false,
+  brightness: 1, hour12: false, alarmSound: true, alarmFlash: true,
+  clickAdjust: true, nightAuto: false, autoLandscapeFullscreen: true
+};
+
+var mode = 'clock';
+var timerSeconds = 0;
+var timerRunning = false;
+var lastTimerTick = 0;
+var lastSec = -1;
+var alarmFired = false;
+var burnX = 0, burnY = 0;
+var panelOpen = false;
+var panelShiftY = 0;
+
+var stage   = document.getElementById('stage');
+var content = document.getElementById('content');
+var clockEl = document.getElementById('clock');
+var dock    = document.getElementById('dock');
+var sheet   = document.getElementById('sheet');
+var sheetHeader   = document.getElementById('sheetHeader');
+var sheetBackdrop = document.getElementById('sheetBackdrop');
+var elAmPm  = document.getElementById('iAmPm');
+var elYear  = document.getElementById('iYear');
+var elDate  = document.getElementById('iDate');
+var elWeek  = document.getElementById('iWeek');
+var elBat   = document.getElementById('iBat');
+
+var cards = {};
+var miniSec = null;
+var colS = null;
+var batteryOk = false;
+var batteryText = '';
+
+function makeCard(gkey){
+  var c = document.createElement('div');
+  c.className = 'card';
+  c.dataset.v = '0';
+  c.dataset.gkey = gkey;
+  c.innerHTML =
+    '<div class="half upper s-up"><div class="inner">0</div></div>' +
+    '<div class="half lower s-dn"><div class="inner">0</div></div>' +
+    '<div class="half upper flip flip-top"><div class="inner">0</div></div>' +
+    '<div class="half lower flip flip-bottom"><div class="inner">0</div></div>';
+  return c;
+}
+
+function buildClock(){
+  clockEl.innerHTML = '';
+  var defs = [
+    { gkey:'h', cls:'g-h', keys:['h1','h2'] },
+    { gkey:'m', cls:'g-m', keys:['m1','m2'] },
+    { gkey:'s', cls:'g-s', keys:['s1','s2'] }
+  ];
+  for (var di = 0; di < defs.length; di++){
+    var d = defs[di];
+    var col = document.createElement('div');
+    col.className = 'group-col';
+    col.dataset.gkey = d.gkey;
+
+    var btnUp = document.createElement('button');
+    btnUp.className = 'adj adj-up';
+    btnUp.dataset.gkey = d.gkey;
+    btnUp.dataset.dir = '1';
+    btnUp.textContent = '+';
+
+    var btnDn = document.createElement('button');
+    btnDn.className = 'adj adj-down';
+    btnDn.dataset.gkey = d.gkey;
+    btnDn.dataset.dir = '-1';
+    btnDn.textContent = '\u2212';
+
+    var inner = document.createElement('div');
+    inner.className = 'group ' + d.cls;
+    for (var ki = 0; ki < d.keys.length; ki++){
+      var k = d.keys[ki];
+      var c = makeCard(d.gkey);
+      cards[k] = c;
+      inner.appendChild(c);
+    }
+    if (d.gkey === 'm'){
+      miniSec = document.createElement('div');
+      miniSec.className = 'mini-sec';
+      miniSec.textContent = '00';
+      inner.appendChild(miniSec);
+    }
+    col.appendChild(btnUp);
+    col.appendChild(inner);
+    col.appendChild(btnDn);
+    clockEl.appendChild(col);
+    if (d.gkey === 's') colS = col;
+    bindSwipe(inner, d.gkey);
+  }
+  updateAdjVisibility();
+}
+
+function setDigit(card, to, instant){
+  var from = card.dataset.v;
+  if (from === to) return false;
+  card.dataset.v = to;
+
+  var upIn = card.querySelector('.s-up .inner');
+  var dnIn = card.querySelector('.s-dn .inner');
+  var ft   = card.querySelector('.flip-top');
+  var fb   = card.querySelector('.flip-bottom');
+  var fti  = ft.querySelector('.inner');
+  var fbi  = fb.querySelector('.inner');
+
+  if (card._tid){ clearTimeout(card._tid); card._tid = null; }
+
+  if (instant){
+    ft.style.transition = 'none'; fb.style.transition = 'none';
+    upIn.textContent = to; dnIn.textContent = to;
+    fti.textContent = to; fbi.textContent = to;
+    ft.style.webkitTransform = 'rotateX(0deg)'; ft.style.transform = 'rotateX(0deg)';
+    fb.style.webkitTransform = 'rotateX(90deg)'; fb.style.transform = 'rotateX(90deg)';
+    return true;
+  }
+
+  upIn.textContent = to;
+  dnIn.textContent = from;
+
+  ft.style.transition = 'none'; ft.style.webkitTransition = 'none';
+  fb.style.transition = 'none'; fb.style.webkitTransition = 'none';
+  fti.textContent = from; fbi.textContent = to;
+  ft.style.webkitTransform = 'rotateX(0deg)'; ft.style.transform = 'rotateX(0deg)';
+  fb.style.webkitTransform = 'rotateX(90deg)'; fb.style.transform = 'rotateX(90deg)';
+  void ft.offsetWidth;
+
+  var ease = 'cubic-bezier(.45,.05,.55,.95)';
+  ft.style.webkitTransition = '-webkit-transform .32s ' + ease;
+  ft.style.transition = 'transform .32s ' + ease + ', -webkit-transform .32s ' + ease;
+  fb.style.webkitTransition = '-webkit-transform .32s ' + ease + ' .32s';
+  fb.style.transition = 'transform .32s ' + ease + ' .32s, -webkit-transform .32s ' + ease + ' .32s';
+
+  ft.style.webkitTransform = 'rotateX(-90deg)'; ft.style.transform = 'rotateX(-90deg)';
+  fb.style.webkitTransform = 'rotateX(0deg)'; fb.style.transform = 'rotateX(0deg)';
+
+  card._tid = setTimeout(function(){
+    card._tid = null;
+    ft.style.webkitTransition = 'none'; ft.style.transition = 'none';
+    fb.style.webkitTransition = 'none'; fb.style.transition = 'none';
+    dnIn.textContent = to; fti.textContent = to;
+    ft.style.webkitTransform = 'rotateX(0deg)'; ft.style.transform = 'rotateX(0deg)';
+    fb.style.webkitTransform = 'rotateX(90deg)'; fb.style.transform = 'rotateX(90deg)';
+  }, 670);
+  return true;
+}
+
+var audioCtx = null;
+var noiseBuf = null;
+
+function initAudio(){
+  if (audioCtx) return;
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  try { audioCtx = new AC(); } catch(e){ audioCtx = null; return; }
+  var len = Math.floor(audioCtx.sampleRate * 0.07);
+  noiseBuf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+  var d = noiseBuf.getChannelData(0);
+  for (var i = 0; i < len; i++){
+    var env = Math.pow(1 - i / len, 2.4);
+    d[i] = (Math.random() * 2 - 1) * env;
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function withAudio(cb){
+  initAudio();
+  if (!audioCtx) return;
+  if (audioCtx.state === 'suspended'){
+    try {
+      var p = audioCtx.resume();
+      if (p && p.then) p.then(cb)['catch'](cb); else cb();
+    } catch(e){ cb(); }
+  } else cb();
+}
+
+function playFlip(vol){
+  if (!state.sound || !audioCtx || !noiseBuf || audioCtx.state !== 'running') return;
+  try {
+    var t = audioCtx.currentTime;
+    var src = audioCtx.createBufferSource(); src.buffer = noiseBuf;
+    var bp = audioCtx.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.value = 1700 + Math.random() * 700; bp.Q.value = 1.1;
+    var g = audioCtx.createGain();
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + 0.06);
+    src.connect(bp); bp.connect(g); g.connect(audioCtx.destination);
+    src.start(t); src.stop(t + 0.08);
+  } catch(e){}
+}
+
+var alarmStopFlag = 0;
+
+function playAlarm(){
+  if (!state.alarmSound) return;
+  withAudio(function(){
+    if (!audioCtx || !state.alarmSound) return;
+    var myFlag = ++alarmStopFlag;
+    var totalBeeps = 10;
+    var intervalMs = 500;
+    for (var i = 0; i < totalBeeps; i++){
+      (function(i){
+        setTimeout(function(){
+          if (myFlag !== alarmStopFlag) return;
+          if (!audioCtx || !state.alarmSound) return;
+          if (audioCtx.state !== 'running') return;
+          try {
+            var osc = audioCtx.createOscillator();
+            var g = audioCtx.createGain();
+            osc.type = 'square';
+            osc.frequency.value = 900;
+            var t = audioCtx.currentTime;
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.exponentialRampToValueAtTime(0.28, t + 0.01);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+            osc.connect(g); g.connect(audioCtx.destination);
+            osc.start(t); osc.stop(t + 0.38);
+          } catch(e){}
+        }, i * intervalMs);
+      })(i);
+    }
+  });
+}
+
+function unlockAudio(){
+  initAudio();
+  if (audioCtx && audioCtx.state === 'suspended') { try { audioCtx.resume(); } catch(e){} }
+  document.removeEventListener('pointerdown', unlockAudio);
+  document.removeEventListener('touchstart', unlockAudio);
+}
+document.addEventListener('pointerdown', unlockAudio, {passive:true});
+document.addEventListener('touchstart', unlockAudio, {passive:true});
+
+function pad2(n){ return n < 10 ? '0' + n : '' + n; }
+var WEEK = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+
+function getDigits(now){
+  if (mode === 'clock'){
+    var h = now.getHours();
+    var h12 = h % 12; if (h12 === 0) h12 = 12;
+    return { h: state.hour12 ? pad2(h12) : pad2(h), m: pad2(now.getMinutes()), s: pad2(now.getSeconds()) };
+  }
+  var total = Math.max(0, timerSeconds);
+  var hh = Math.floor(total / 3600);
+  var mm = Math.floor((total % 3600) / 60);
+  var ss = total % 60;
+  if (!state.seconds) ss = 0;
+  if (hh > 99) hh = 99;
+  return { h: pad2(hh), m: pad2(mm), s: pad2(ss) };
+}
+
+function render(now, instant){
+  var d = getDigits(now);
+  var changed = false;
+  if (setDigit(cards.h1, d.h[0], instant)) changed = true;
+  if (setDigit(cards.h2, d.h[1], instant)) changed = true;
+  if (setDigit(cards.m1, d.m[0], instant)) changed = true;
+  if (setDigit(cards.m2, d.m[1], instant)) changed = true;
+  if (state.seconds){
+    if (setDigit(cards.s1, d.s[0], instant)) changed = true;
+    if (setDigit(cards.s2, d.s[1], instant)) changed = true;
+  }
+  if (miniSec && mode === 'clock' && !state.seconds){
+    miniSec.textContent = pad2(now.getSeconds());
+  }
+  if (mode === 'clock'){
+    if (state.hour12){
+      elAmPm.style.display = '';
+      elAmPm.textContent = now.getHours() < 12 ? '上午' : '下午';
+    } else elAmPm.style.display = 'none';
+    var y = now.getFullYear() + '年';
+    if (elYear.textContent !== y) elYear.textContent = y;
+    var dt = (now.getMonth() + 1) + '月' + now.getDate() + '日';
+    if (elDate.textContent !== dt) elDate.textContent = dt;
+    var w = WEEK[now.getDay()];
+    if (elWeek.textContent !== w) elWeek.textContent = w;
+  }
+  if (batteryOk && elBat.textContent !== batteryText) elBat.textContent = batteryText;
+  applyInfoVisibility();
+  if (changed && !instant) playFlip(state.seconds ? 0.22 : 0.30);
+}
+
+function applyInfoVisibility(){
+  if (mode === 'clock'){
+    elYear.style.display = state.year ? '' : 'none';
+    elDate.style.display = state.date ? '' : 'none';
+    elWeek.style.display = state.week ? '' : 'none';
+  } else {
+    elAmPm.style.display = 'none'; elYear.style.display = 'none';
+    elDate.style.display = 'none'; elWeek.style.display = 'none';
+  }
+  elBat.style.display = (state.battery && batteryOk) ? '' : 'none';
+}
+
+function applySecondsVisibility(){
+  if (colS) toggleClass(colS, 'hidden', !state.seconds);
+  if (miniSec) toggleClass(miniSec, 'hide', !((mode === 'clock') && !state.seconds));
+  toggleClass(content, 'has-mini-sec', (mode === 'clock') && !state.seconds);
+}
+
+function updateAdjVisibility(){
+  var adjs = clockEl.querySelectorAll('.adj');
+  var show = (mode !== 'clock');
+  for (var i = 0; i < adjs.length; i++) toggleClass(adjs[i], 'hide', !show);
+}
+
+function adjust(gkey, dir){
+  if (mode === 'clock' || (gkey === 's' && !state.seconds)) return;
+  var unit = gkey === 'h' ? 3600 : (gkey === 'm' ? 60 : 1);
+  var nv = Math.max(0, Math.min(99 * 3600 + 59 * 60 + 59, timerSeconds + dir * unit));
+  timerSeconds = nv;
+  if (mode === 'countdown'){
+    if (timerRunning){ timerRunning = false; updateStartBtn(); }
+    alarmFired = false;
+  }
+  render(new Date(), false);
+}
+
+function bindSwipe(el, gkey){
+  var sx = 0, sy = 0, active = false;
+  el.addEventListener('touchstart', function(e){
+    if (mode === 'clock') return;
+    var t = e.touches[0]; sx = t.clientX; sy = t.clientY; active = true;
+  }, {passive:true});
+  el.addEventListener('touchend', function(e){
+    if (!active) return; active = false;
+    if (mode === 'clock') return;
+    var t = e.changedTouches[0];
+    var dx = t.clientX - sx; var dy = t.clientY - sy;
+    if (Math.abs(dy) > 28 && Math.abs(dy) > Math.abs(dx) * 1.2) adjust(gkey, dy > 0 ? 1 : -1);
+  }, {passive:true});
+}
+
+clockEl.addEventListener('click', function(e){
+  var adjBtn = closest(e.target, '.adj');
+  if (adjBtn && mode !== 'clock'){
+    e.stopPropagation();
+    var gkey = adjBtn.dataset.gkey;
+    if (gkey === 's' && !state.seconds) return;
+    adjust(gkey, parseInt(adjBtn.dataset.dir, 10));
+    return;
+  }
+  if (!state.clickAdjust || mode === 'clock') return;
+  var card = closest(e.target, '.card');
+  if (!card) return;
+  var gkey2 = card.dataset.gkey;
+  if (!gkey2 || (gkey2 === 's' && !state.seconds)) return;
+  var rect = card.getBoundingClientRect();
+  adjust(gkey2, (e.clientY - rect.top) < rect.height / 2 ? 1 : -1);
+});
+
+function sizeClock(){
+  var W = stage.clientWidth;
+  var H = stage.clientHeight;
+  var groups = state.seconds ? 3 : 2;
+  var availW = W * 0.94;
+  var availH = H * (state.seconds ? 0.52 : 0.46);
+  var innerGapRatio = 0.08;
+  var groupGapRatio = 0.28;
+  var wf = groups * (2 * 0.66 + innerGapRatio) + (groups - 1) * groupGapRatio;
+  var dhW = availW / wf;
+  var vertFactor = (mode === 'clock') ? 1.0 : 2.2;
+  var dhH = availH / vertFactor;
+  var dh = Math.max(24, Math.min(dhW, dhH));
+  stage.style.setProperty('--dh', dh + 'px');
+  stage.style.setProperty('--dw', (dh * 0.66) + 'px');
+  stage.style.setProperty('--fs', (dh * 1.12) + 'px');
+  stage.style.setProperty('--r',  (dh * 0.13) + 'px');
+  stage.style.setProperty('--inner-gap', (dh * innerGapRatio) + 'px');
+  stage.style.setProperty('--group-gap', (dh * groupGapRatio) + 'px');
+}
+
+function applyLayout(){
+  var W = window.innerWidth;
+  var H = window.innerHeight;
+  stage.style.width = W + 'px';
+  stage.style.height = H + 'px';
+  if (state.rotated){
+    stage.style.left   = (W / 2) + 'px';
+    stage.style.top    = (H / 2) + 'px';
+    stage.style.webkitTransform = 'translate(-50%, -50%) rotate(90deg)';
+    stage.style.transform = 'translate(-50%, -50%) rotate(90deg)';
+  } else {
+    stage.style.left   = '0px';
+    stage.style.top    = '0px';
+    stage.style.webkitTransform = 'none';
+    stage.style.transform = 'none';
+  }
+  sizeClock();
+  updateContentTransform(null);
+}
+
+function computePanelShift(){
+  if (!panelOpen) return 0;
+  var vh = window.innerHeight;
+  if (state.rotated) return -vh * 0.22;
+  var sheetH = sheet.offsetHeight || (vh * 0.5);
+  var contentH = content.offsetHeight || (vh * 0.4);
+  var centeredBottom = (vh + contentH) / 2;
+  var sheetTop = vh - sheetH;
+  var targetBottom = sheetTop - 24;
+  var dy = targetBottom - centeredBottom;
+  if (dy > 0) dy = 0;
+  if ((vh - contentH) / 2 + dy < 16) dy = 16 - (vh - contentH) / 2;
+  return dy;
+}
+
+function updateContentTransform(transitionCss){
+  if (typeof transitionCss === 'string'){
+    content.style.webkitTransition = transitionCss.replace('transform','-webkit-transform');
+    content.style.transition = transitionCss;
+  }
+  var tx = burnX, ty = burnY;
+  panelShiftY = computePanelShift();
+  if (state.rotated) tx += panelShiftY; else ty += panelShiftY;
+  var t = 'translate3d(' + tx + 'px,' + ty + 'px,0)';
+  content.style.webkitTransform = t;
+  content.style.transform = t;
+}
+
+var burnTimer = null;
+function burnShift(){
+  if (!state.burnin){ burnX = 0; burnY = 0; updateContentTransform('transform .8s cubic-bezier(.25,.1,.25,1)'); return; }
+  burnX = (Math.random() * 2 - 1) * 8;
+  burnY = (Math.random() * 2 - 1) * 8;
+  updateContentTransform('transform 3s cubic-bezier(.25,.1,.25,1)');
+}
+function startBurnIn(){
+  if (burnTimer) clearInterval(burnTimer);
+  burnShift();
+  burnTimer = setInterval(burnShift, 60000);
+}
+
+function isFullscreen(){ return !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement); }
+function tryEnterFullscreen(){
+  if (isFullscreen()) return;
+  var el = document.documentElement;
+  var fn = el.requestFullscreen || el.webkitRequestFullscreen || el.webkitRequestFullScreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+  if (fn) { try { fn.call(el); setTimeout(applyLock, 300); } catch(e){} }
+}
+function tryExitFullscreen(){
+  if (!isFullscreen()) return;
+  var doc = document;
+  var ex = doc.exitFullscreen || doc.webkitExitFullscreen || doc.webkitCancelFullScreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
+  if (ex){ try { ex.call(doc); } catch(e){} }
+}
+function applyLock(){
+  if (!state.locked){
+    if (screen.orientation && screen.orientation.unlock) { try { screen.orientation.unlock(); } catch(e){} }
+    return;
+  }
+  if (!isFullscreen()) return;
+  if (screen.orientation && screen.orientation.lock){
+    try { var p = screen.orientation.lock(state.rotated ? 'landscape' : 'portrait'); if (p && p['catch']) p['catch'](function(){}); } catch(e){}
+  }
+}
+
+function getPhysicalOrientation(){
+  if (screen.orientation && screen.orientation.type){
+    if (screen.orientation.type.indexOf('landscape') === 0) return 'landscape';
+    if (screen.orientation.type.indexOf('portrait') === 0) return 'portrait';
+  }
+  if (typeof window.orientation !== 'undefined' && window.orientation !== null) return Math.abs(window.orientation) === 90 ? 'landscape' : 'portrait';
+  return window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
+}
+
+var orientationDebounce = null;
+function handleOrientationChange(){
+  if (!state.autoLandscapeFullscreen || state.rotated) return;
+  clearTimeout(orientationDebounce);
+  orientationDebounce = setTimeout(function(){
+    var o = getPhysicalOrientation();
+    if (o === 'landscape') tryEnterFullscreen();
+    else if (isFullscreen()) tryExitFullscreen();
+  }, 350);
+}
+if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', handleOrientationChange);
+window.addEventListener('orientationchange', handleOrientationChange);
+window.addEventListener('resize', function(){
+  if (state.autoLandscapeFullscreen && !state.rotated){
+    clearTimeout(orientationDebounce);
+    orientationDebounce = setTimeout(function(){
+      var o = getPhysicalOrientation();
+      if (o === 'landscape' && !isFullscreen()) tryEnterFullscreen();
+      else if (o === 'portrait' && isFullscreen()) tryExitFullscreen();
+    }, 400);
+  }
+});
+
+var firstTouchDone = false;
+function firstTouchHandler(){
+  if (firstTouchDone) return;
+  firstTouchDone = true;
+  initAudio();
+  if (state.autoLandscapeFullscreen && !state.rotated) tryEnterFullscreen();
+  document.removeEventListener('pointerdown', firstTouchHandler);
+  document.removeEventListener('touchstart', firstTouchHandler);
+}
+document.addEventListener('pointerdown', firstTouchHandler, {passive:true});
+document.addEventListener('touchstart', firstTouchHandler, {passive:true});
+
+function isNight(){ var h = new Date().getHours(); return h >= 22 || h < 7; }
+function applyBrightness(){
+  var b = state.brightness;
+  if (state.nightAuto && isNight()) b = Math.min(b, 0.45);
+  content.style.webkitFilter = (b >= 1) ? '' : 'brightness(' + b + ')';
+  content.style.filter = (b >= 1) ? '' : 'brightness(' + b + ')';
+}
+
+function switchMode(m){
+  mode = m;
+  alarmFired = false;
+  if (mode === 'clock'){
+    timerRunning = false;
+  } else if (mode === 'stopwatch'){
+    timerSeconds = 0;
+    timerRunning = false;
+  } else if (mode === 'countdown'){
+    timerSeconds = 0;
+    timerRunning = false;
+  }
+  updateAdjVisibility();
+  updateModeUI();
+  applySecondsVisibility();
+  applyLayout();
+  tick(true);
+}
+
+function updateModeUI(){
+  var bc = document.getElementById('btnClock');
+  var bs = document.getElementById('btnStopwatch');
+  var bcd = document.getElementById('btnCountdown');
+  removeClass(bc,'active-clock'); removeClass(bc,'active-stopwatch'); removeClass(bc,'active-countdown');
+  removeClass(bs,'active-clock'); removeClass(bs,'active-stopwatch'); removeClass(bs,'active-countdown');
+  removeClass(bcd,'active-clock'); removeClass(bcd,'active-stopwatch'); removeClass(bcd,'active-countdown');
+  if (mode === 'clock') addClass(bc,'active-clock');
+  else if (mode === 'stopwatch') addClass(bs,'active-stopwatch');
+  else if (mode === 'countdown') addClass(bcd,'active-countdown');
+
+  var btnStart = document.getElementById('btnStart');
+  var btnReset = document.getElementById('btnReset');
+  var isTimer = (mode !== 'clock');
+  if (isTimer) {
+    btnStart.style.display = '';
+    btnReset.style.display = '';
+  } else {
+    btnStart.style.display = 'none';
+    btnReset.style.display = 'none';
+  }
+  updateStartBtn();
+}
+
+function updateStartBtn(){
+  var bs = document.getElementById('btnStart');
+  if (mode === 'clock') return;
+  bs.textContent = timerRunning ? '暂停' : '开始';
+}
+function updateSoundBtn(){
+  var b = document.getElementById('btnSound');
+  toggleClass(b, 'on', state.sound);
+}
+
+function tick(force){
+  if (mode === 'clock'){
+    var now = new Date();
+    var sec = now.getSeconds();
+    if (!force && sec === lastSec) return;
+    lastSec = sec;
+    render(now, false);
+    return;
+  }
+  render(new Date(), false);
+}
+
+var loopTimer = null;
+function startLoop(){
+  if (loopTimer) clearInterval(loopTimer);
+  loopTimer = setInterval(function(){
+    if (mode === 'clock'){
+      var now = new Date();
+      var sec = now.getSeconds();
+      if (sec !== lastSec){ lastSec = sec; render(now, false); }
+      if (state.nightAuto) applyBrightness();
+    } else {
+      if (timerRunning){
+        var t = Date.now();
+        if (t - lastTimerTick >= 1000){
+          lastTimerTick = t;
+          if (mode === 'stopwatch') timerSeconds = Math.min(99*3600+59*60+59, timerSeconds + 1);
+          else if (mode === 'countdown'){
+            timerSeconds = Math.max(0, timerSeconds - 1);
+            if (timerSeconds === 0 && !alarmFired){
+              timerRunning = false; alarmFired = true;
+              updateStartBtn(); triggerAlarm();
+            }
+          }
+          render(new Date(), false);
+        }
+      }
+    }
+  }, 80);
+}
+
+function triggerAlarm(){
+  if (state.alarmSound) playAlarm();
+  if (state.alarmFlash){
+    addClass(stage, 'alarming');
+    setTimeout(function(){ removeClass(stage, 'alarming'); }, 6400);
+  }
+}
+
+function syncSheet(){
+  var inputs = sheet.querySelectorAll('input[data-key]');
+  for (var i = 0; i < inputs.length; i++) inputs[i].checked = !!state[inputs[i].dataset.key];
+  var h12btns = sheet.querySelectorAll('.seg-btn[data-act="hour12"]');
+  for (var j = 0; j < h12btns.length; j++) toggleClass(h12btns[j], 'on', (h12btns[j].dataset.val === '1') === state.hour12);
+  var brbtns = sheet.querySelectorAll('.seg-btn[data-act="bright"]');
+  for (var k = 0; k < brbtns.length; k++) toggleClass(brbtns[k], 'on', parseFloat(brbtns[k].dataset.val) === state.brightness);
+}
+
+function setPanelState(open){
+  if (panelOpen === open) return;
+  panelOpen = open;
+  updateContentTransform('transform .55s cubic-bezier(.32,.72,0,1)');
+  setTimeout(function(){ if (!drag.active) updateContentTransform('transform 3s cubic-bezier(.25,.1,.25,1)'); }, 580);
+}
+
+var drag = { active:false, source:null, moved:false, startY:0, startTranslate:0, lastY:0, lastTime:0, velocity:0, panelH:0 };
+function getEventY(e){
+  if (e.touches && e.touches.length) return e.touches[0].clientY;
+  if (e.changedTouches && e.changedTouches.length) return e.changedTouches[0].clientY;
+  if (typeof e.clientY === 'number') return e.clientY;
+  return 0;
+}
+function setSheetY(y){ sheet.style.webkitTransform = 'translateY(' + y + 'px)'; sheet.style.transform = 'translateY(' + y + 'px)'; }
+
+function onDragStart(e, source){
+  if (source === 'header' && !panelOpen) return;
+  if (source === 'settings' && panelOpen) return;
+  drag.active = true; drag.source = source; drag.moved = false;
+  drag.startY = getEventY(e); drag.lastY = drag.startY; drag.lastTime = Date.now(); drag.velocity = 0;
+  drag.panelH = sheet.offsetHeight || window.innerHeight * 0.6;
+  sheet.style.webkitTransition = 'none'; sheet.style.transition = 'none';
+  if (source === 'settings'){
+    drag.startTranslate = drag.panelH; setSheetY(drag.panelH);
+    addClass(sheetBackdrop, 'show'); sheetBackdrop.style.webkitTransition = 'none'; sheetBackdrop.style.transition = 'none'; sheetBackdrop.style.opacity = '0';
+    if (!panelOpen){ panelOpen = true; updateContentTransform('transform .45s cubic-bezier(.32,.72,0,1)'); }
+  } else drag.startTranslate = 0;
+}
+function onDragMove(e){
+  if (!drag.active) return;
+  var y = getEventY(e); var dy = y - drag.startY;
+  if (Math.abs(dy) > 5) drag.moved = true;
+  var dt = Date.now() - drag.lastTime;
+  if (dt > 0) drag.velocity = (y - drag.lastY) / dt;
+  drag.lastY = y; drag.lastTime = Date.now();
+  var newT = Math.max(0, Math.min(drag.panelH, drag.startTranslate + dy));
+  setSheetY(newT);
+  sheetBackdrop.style.opacity = Math.max(0, Math.min(1, 1 - newT / drag.panelH));
+}
+function onDragEnd(e){
+  if (!drag.active) return; drag.active = false;
+  var y = getEventY(e); var dy = y - drag.startY;
+  var newT = Math.max(0, Math.min(drag.panelH, drag.startTranslate + dy));
+  if (!drag.moved){
+    if (drag.source === 'settings') animateSheet(0, true);
+    else { sheet.style.webkitTransition = ''; sheet.style.transition = ''; sheet.style.webkitTransform = ''; sheet.style.transform = ''; }
+    return;
+  }
+  var v = drag.velocity;
+  var shouldOpen = (v < -0.5) ? true : (v > 0.5 ? false : (newT < drag.panelH * 0.5));
+  animateSheet(shouldOpen ? 0 : drag.panelH, shouldOpen);
+}
+function animateSheet(targetT, open){
+  addClass(sheet, 'animating'); setSheetY(targetT);
+  sheetBackdrop.style.webkitTransition = 'opacity .3s ease'; sheetBackdrop.style.transition = 'opacity .3s ease';
+  sheetBackdrop.style.opacity = open ? '1' : '0';
+  setTimeout(function(){
+    removeClass(sheet, 'animating'); sheet.style.webkitTransition = ''; sheet.style.transition = '';
+    if (open){ setSheetY(0); setPanelState(true); }
+    else { setSheetY(drag.panelH || window.innerHeight); removeClass(sheetBackdrop, 'show'); setPanelState(false); }
+  }, 360);
+}
+
+function bindDragStart(el, source){
+  el.addEventListener('touchstart', function(e){ if (closest(e.target, '.sheet-done')) return; onDragStart(e, source); }, {passive:true});
+  el.addEventListener('mousedown', function(e){ if (closest(e.target, '.sheet-done')) return; onDragStart(e, source); });
+}
+bindDragStart(sheetHeader, 'header');
+bindDragStart(document.getElementById('btnSettings'), 'settings');
+
+document.addEventListener('touchmove', function(e){ if (drag.active) onDragMove(e); }, {passive:true});
+document.addEventListener('touchend', function(e){ if (drag.active) onDragEnd(e); }, {passive:true});
+document.addEventListener('touchcancel', function(e){ if (drag.active) onDragEnd(e); }, {passive:true});
+document.addEventListener('mousemove', function(e){ if (drag.active) onDragMove(e); });
+document.addEventListener('mouseup', function(e){ if (drag.active) onDragEnd(e); });
+
+dock.addEventListener('click', function(e){ e.stopPropagation(); });
+
+document.getElementById('btnClock').addEventListener('click', function(){ if (mode !== 'clock') switchMode('clock'); });
+document.getElementById('btnStopwatch').addEventListener('click', function(){ if (mode !== 'stopwatch') switchMode('stopwatch'); });
+document.getElementById('btnCountdown').addEventListener('click', function(){ if (mode !== 'countdown') switchMode('countdown'); });
+document.getElementById('btnStart').addEventListener('click', function(){
+  if (mode === 'clock' || (mode === 'countdown' && timerSeconds === 0)) return;
+  timerRunning = !timerRunning;
+  if (timerRunning){ lastTimerTick = Date.now(); alarmFired = false; }
+  updateStartBtn();
+});
+document.getElementById('btnReset').addEventListener('click', function(){
+  timerSeconds = 0; timerRunning = false; alarmFired = false;
+  updateStartBtn(); tick(true);
+});
+document.getElementById('btnSound').addEventListener('click', function(){
+  state.sound = !state.sound; updateSoundBtn(); syncSheet();
+  if (state.sound){ initAudio(); if (audioCtx && audioCtx.state === 'suspended') { try { audioCtx.resume(); } catch(e){} } }
+});
+document.getElementById('btnFullscreen').addEventListener('click', function(){
+  if (isFullscreen()) tryExitFullscreen(); else tryEnterFullscreen();
+});
+document.getElementById('btnSheetDone').addEventListener('click', function(){ animateSheet(drag.panelH || sheet.offsetHeight, false); });
+sheetBackdrop.addEventListener('click', function(){ animateSheet(drag.panelH || sheet.offsetHeight, false); });
+
+sheet.addEventListener('change', function(e){
+  var input = e.target;
+  if (!input.matches || !input.matches('input[data-key]')) return;
+  var key = input.dataset.key; state[key] = input.checked;
+  if (key === 'seconds'){ applySecondsVisibility(); applyLayout(); }
+  if (key === 'battery' || key === 'year' || key === 'date' || key === 'week') applyInfoVisibility();
+  if (key === 'burnin'){ if (state.burnin) startBurnIn(); else burnShift(); }
+  if (key === 'nightAuto') applyBrightness();
+  if (key === 'rotated'){ applyLayout(); if (state.locked) applyLock(); }
+  if (key === 'locked') applyLock();
+  if (key === 'autoLandscapeFullscreen' && state.autoLandscapeFullscreen){ if (getPhysicalOrientation() === 'landscape') tryEnterFullscreen(); }
+  tick(true);
+});
+sheet.addEventListener('click', function(e){
+  var seg = closest(e.target, '.seg-btn');
+  if (seg){
+    var act = seg.dataset.act, val = seg.dataset.val;
+    if (act === 'hour12'){ state.hour12 = (val === '1'); syncSheet(); tick(true); }
+    else if (act === 'bright'){ state.brightness = parseFloat(val); applyBrightness(); syncSheet(); }
+    return;
+  }
+  var chip = closest(e.target, '.chip');
+  if (chip){
+    timerSeconds = parseInt(chip.dataset.preset, 10); alarmFired = false;
+    if (mode !== 'countdown') switchMode('countdown');
+    timerRunning = false; updateStartBtn(); tick(true);
+    return;
+  }
+});
+document.addEventListener('fullscreenchange', function(){ setTimeout(applyLock, 100); });
+document.addEventListener('webkitfullscreenchange', function(){ setTimeout(applyLock, 100); });
+
+function initBattery(){
+  if (!navigator.getBattery){ batteryOk = false; return; }
+  navigator.getBattery().then(function(b){
+    batteryOk = true;
+    function upd(){ batteryText = (b.charging ? '⚡' : '') + Math.round(b.level * 100) + '%'; elBat.textContent = batteryText; applyInfoVisibility(); }
+    upd(); b.addEventListener('levelchange', upd); b.addEventListener('chargingchange', upd);
+  })['catch'](function(){ batteryOk = false; });
+}
+
+function hideDock(){ addClass(dock, 'hide'); removeClass(stage, 'dock-shown'); }
+function showDock(){ removeClass(dock, 'hide'); addClass(stage, 'dock-shown'); }
+
+stage.addEventListener('click', function(){
+  if (panelOpen) return;
+  if (hasClass(dock, 'hide')) showDock(); else hideDock();
+});
+var autoHide = setTimeout(hideDock, 8000);
+dock.addEventListener('touchstart', function(){
+  clearTimeout(autoHide);
+  autoHide = setTimeout(hideDock, 10000);
+}, {passive:true});
+
+function boot(){
+  buildClock();
+  updateModeUI();
+  updateSoundBtn();
+  syncSheet();
+  applySecondsVisibility();
+  applyLayout();
+  applyBrightness();
+  initBattery();
+  startBurnIn();
+  startLoop();
+  tick(true);
+
+  var rt = null;
+  window.addEventListener('resize', function(){
+    clearTimeout(rt);
+    rt = setTimeout(function(){ applyLayout(); tick(true); }, 120);
+  });
+  window.addEventListener('orientationchange', function(){ setTimeout(function(){ applyLayout(); tick(true); }, 260); });
+  document.addEventListener('visibilitychange', function(){
+    if (!document.hidden){
+      lastSec = -1; if (state.nightAuto) applyBrightness();
+      if (mode === 'clock') tick(true); else render(new Date(), false);
+    }
+  });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+else boot();
+
+})();
+</script>
+</body>
+</html>
